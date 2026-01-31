@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # =========================================
+  # TimescaleDB - Time-series Database
+  # =========================================
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: mep_timescaledb
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-mep_digital_twin}
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mep_network
+    restart: unless-stopped
+
+  # =========================================
+  # FastAPI Backend
+  # =========================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: mep_api
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@timescaledb:5432/${POSTGRES_DB:-mep_digital_twin}
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      PHYSICS_STRICT_MODE: ${PHYSICS_STRICT_MODE:-false}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app/api
+      - ./core:/app/core
+      - ./engine:/app/engine
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    networks:
+      - mep_network
+    restart: unless-stopped
+
+  # =========================================
+  # Streamlit Dashboard
+  # =========================================
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: mep_dashboard
+    environment:
+      API_URL: http://api:8000
+      STREAMLIT_SERVER_PORT: 8501
+      STREAMLIT_SERVER_HEADLESS: "true"
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./app:/app/app
+      - ./core:/app/core
+    depends_on:
+      - api
+    networks:
+      - mep_network
+    restart: unless-stopped
+
+# =========================================
+# Volumes
+# =========================================
+volumes:
+  timescale_data:
+    driver: local
+
+# =========================================
+# Networks
+# =========================================
+networks:
+  mep_network:
+    driver: bridge
