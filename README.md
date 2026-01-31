@@ -1,16 +1,3 @@
----
-
-**Steps:**
-1. Click on `README.md` in your repo
-2. Click the **Edit (pencil)** icon
-3. **Select all and delete** existing content
-4. Copy everything below (from the first ` ``` ` to the last ` ``` `)
-5. Paste it
-6. Click **Commit changes**
-
----
-
-```
 # 🏭 Physics-Aware MEP Digital Twin & Predictive Maintenance SaaS
 
 <div align="center">
